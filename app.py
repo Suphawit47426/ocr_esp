@@ -1,109 +1,160 @@
-import os
+from datetime import datetime
 import io
+import os
+from flask import CORS, Flask, jsonify, render_template_string, request
 import numpy as np
 from PIL import Image
 import pytesseract
-from flask import Flask, request, jsonify, render_template_string
-from flask_cors import CORS
-from datetime import datetime
 import pytz
 
 app = Flask(__name__)
 # ปลดล็อค CORS ให้อุปกรณ์ภายนอกส่งรูปเข้ามาได้
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# ตัวแปรเก็บค่าเซ็นเซอร์ปัจจุบันและค่า Threshold สำหรับหน้า Dashboard
+# ตัวแปรเก็บค่าเซ็นเซอร์ปัจจุบัน, สถานะเปิด/ปิด (Toggles) และค่า Threshold สำหรับหน้า Dashboard
 system_data = {
     "temp": 0,
     "carbon": 0,
     "hum": 0,
-    "t_min": 30, "t_max": 82,
-    "c_min": 10, "c_max": 50,
-    "h_min": 50, "h_max": 90,
-    "timestamp": "ยังไม่มีข้อมูล"
+    "en_t": 1,
+    "en_c": 1,
+    "en_h": 1,
+    "t_min": 30,
+    "t_max": 82,
+    "c_min": 10,
+    "c_max": 50,
+    "h_min": 50,
+    "h_max": 90,
+    "timestamp": "ยังไม่มีข้อมูล",
 }
 
-@app.route('/', methods=['GET'])
+
+@app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({"status": "Cloud OCR Server is running!"}), 200
+  return jsonify({"status": "Cloud OCR Server is running!"}), 200
+
 
 # ---------------------------------------------------------
 # ฟังก์ชันเดิมของคุณ (ห้ามแก้ไขโครงสร้างการประมวลผล OCR)
 # ---------------------------------------------------------
-@app.route('/process_ocr', methods=['POST'])
+@app.route("/process_ocr", methods=["POST"])
 def process_ocr():
-    if 'image' not in request.files:
-        return jsonify({"success": False, "number": "--.-", "error": "No image sent"}), 400
+  if "image" not in request.files:
+    return (
+        jsonify({"success": False, "number": "--.-", "error": "No image sent"}),
+        400,
+    )
 
-    file = request.files['image']
-    image_bytes = file.read()
+  file = request.files["image"]
+  image_bytes = file.read()
 
-    try:
-        image = Image.open(io.BytesIO(image_bytes)).convert('L')
+  try:
+    image = Image.open(io.BytesIO(image_bytes)).convert("L")
 
-        # ปรับให้อ่านเฉพาะตัวเลขและจุดทศนิยมแบบบรรทัดเดียว
-        custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.-'
-        detected_number = pytesseract.image_to_string(image, config=custom_config).strip()
+    # ปรับให้อ่านเฉพาะตัวเลขและจุดทศนิยมแบบบรรทัดเดียว
+    custom_config = r"--psm 7 -c tessedit_char_whitelist=0123456789.-"
+    detected_number = pytesseract.image_to_string(
+        image, config=custom_config
+    ).strip()
 
-        if detected_number:
-            print(f"[Cloud OCR Result]: {detected_number}")
-            return jsonify({"success": True, "number": detected_number})
-        else:
-            return jsonify({"success": False, "number": "--.-"})
+    if detected_number:
+      print(f"[Cloud OCR Result]: {detected_number}")
+      return jsonify({"success": True, "number": detected_number})
+    else:
+      return jsonify({"success": False, "number": "--.-"})
 
-    except Exception as e:
-        print(f"Error processing image: {e}")
-        return jsonify({"success": False, "number": "ERR", "error": str(e)}), 500
+  except Exception as e:
+    print(f"Error processing image: {e}")
+    return jsonify({"success": False, "number": "ERR", "error": str(e)}), 500
+
 
 # ---------------------------------------------------------
-# เพิ่มเติม: ส่วนรับข้อมูล, API และ Dashboard สไตล์วิศวกร
+# ส่วนรับข้อมูล, API และ Dashboard สไตล์วิศวกร (รองรับ Toggle ปิดแสดงผล)
 # ---------------------------------------------------------
-@app.route('/update_readings', methods=['POST'])
+@app.route("/update_readings", methods=["POST"])
 def update_readings():
-    global system_data
-    data = request.form if request.form else request.json
-    if not data:
-        data = request.args
+  global system_data
+  data = request.form if request.form else request.json
+  if not data:
+    data = request.args
 
-    if 'temp' in data and data.get('temp') is not None: 
-        try: system_data["temp"] = float(data.get('temp'))
-        except: pass
-    if 'carbon' in data and data.get('carbon') is not None: 
-        try: system_data["carbon"] = float(data.get('carbon'))
-        except: pass
-    if 'hum' in data and data.get('hum') is not None: 
-        try: system_data["hum"] = float(data.get('hum'))
-        except: pass
-    if 't_min' in data: 
-        try: system_data["t_min"] = float(data.get('t_min'))
-        except: pass
-    if 't_max' in data: 
-        try: system_data["t_max"] = float(data.get('t_max'))
-        except: pass
-    if 'c_min' in data: 
-        try: system_data["c_min"] = float(data.get('c_min'))
-        except: pass
-    if 'c_max' in data: 
-        try: system_data["c_max"] = float(data.get('c_max'))
-        except: pass
-    if 'h_min' in data: 
-        try: system_data["h_min"] = float(data.get('h_min'))
-        except: pass
-    if 'h_max' in data: 
-        try: system_data["h_max"] = float(data.get('h_max'))
-        except: pass
+  if "temp" in data and data.get("temp") is not None:
+    try:
+      system_data["temp"] = float(data.get("temp"))
+    except:
+      pass
+  if "carbon" in data and data.get("carbon") is not None:
+    try:
+      system_data["carbon"] = float(data.get("carbon"))
+    except:
+      pass
+  if "hum" in data and data.get("hum") is not None:
+    try:
+      system_data["hum"] = float(data.get("hum"))
+    except:
+      pass
 
-    tz = pytz.timezone('Asia/Bangkok')
-    system_data["timestamp"] = datetime.now(tz).strftime('%d/%m/%Y, %H:%M:%S')
-    return jsonify({"success": True})
+  # รับสถานะเปิด/ปิดเซ็นเซอร์ (Toggles)
+  if "en_t" in data:
+    try:
+      system_data["en_t"] = int(data.get("en_t"))
+    except:
+      pass
+  if "en_c" in data:
+    try:
+      system_data["en_c"] = int(data.get("en_c"))
+    except:
+      pass
+  if "en_h" in data:
+    try:
+      system_data["en_h"] = int(data.get("en_h"))
+    except:
+      pass
 
-@app.route('/api/data', methods=['GET'])
+  if "t_min" in data:
+    try:
+      system_data["t_min"] = float(data.get("t_min"))
+    except:
+      pass
+  if "t_max" in data:
+    try:
+      system_data["t_max"] = float(data.get("t_max"))
+    except:
+      pass
+  if "c_min" in data:
+    try:
+      system_data["c_min"] = float(data.get("c_min"))
+    except:
+      pass
+  if "c_max" in data:
+    try:
+      system_data["c_max"] = float(data.get("c_max"))
+    except:
+      pass
+  if "h_min" in data:
+    try:
+      system_data["h_min"] = float(data.get("h_min"))
+    except:
+      pass
+  if "h_max" in data:
+    try:
+      system_data["h_max"] = float(data.get("h_max"))
+    except:
+      pass
+
+  tz = pytz.timezone("Asia/Bangkok")
+  system_data["timestamp"] = datetime.now(tz).strftime("%d/%m/%Y, %H:%M:%S")
+  return jsonify({"success": True})
+
+
+@app.route("/api/data", methods=["GET"])
 def get_api_data():
-    return jsonify(system_data)
+  return jsonify(system_data)
 
-@app.route('/dashboard', methods=['GET'])
+
+@app.route("/dashboard", methods=["GET"])
 def dashboard():
-    html_content = """
+  html_content = """
     <!DOCTYPE html>
     <html lang="th">
     <head>
@@ -140,6 +191,7 @@ def dashboard():
         
         .metric-display { display: flex; align-items: baseline; justify-content: space-between; margin: 15px 0; }
         .metric-value { font-size: 2.8rem; font-weight: 700; font-family: 'Courier New', monospace; color: var(--text-main); }
+        .disabled-text { font-size: 2rem; color: var(--text-muted); font-style: italic; }
         
         .threshold-panel { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; font-size: 0.82rem; display: flex; justify-content: space-between; color: var(--text-muted); }
         .threshold-panel span b { color: var(--text-main); font-family: monospace; }
@@ -160,9 +212,9 @@ def dashboard():
           <div class="card-title">🌡️ อุณหภูมิ (Temperature)</div>
           <div class="metric-display">
             <div class="metric-value" id="v-temp">--.-</div>
-            <div style="color: var(--text-muted); font-weight: 600;">UNIT</div>
+            <div style="color: var(--text-muted); font-weight: 600;" id="unit-temp">UNIT</div>
           </div>
-          <div class="threshold-panel">
+          <div class="threshold-panel" id="panel-temp">
             <span>Min Limit: <b id="t-min" style="color:var(--accent-orange)">--</b></span>
             <span>Max Limit: <b id="t-max" style="color:var(--accent-red)">--</b></span>
           </div>
@@ -173,9 +225,9 @@ def dashboard():
           <div class="card-title">🧪 คาร์บอน (Carbon)</div>
           <div class="metric-display">
             <div class="metric-value" id="v-carbon">--.-</div>
-            <div style="color: var(--text-muted); font-weight: 600;">PPM</div>
+            <div style="color: var(--text-muted); font-weight: 600;" id="unit-carbon">PPM</div>
           </div>
-          <div class="threshold-panel">
+          <div class="threshold-panel" id="panel-carbon">
             <span>Min Limit: <b id="c-min" style="color:var(--accent-orange)">--</b></span>
             <span>Max Limit: <b id="c-max" style="color:var(--accent-red)">--</b></span>
           </div>
@@ -186,9 +238,9 @@ def dashboard():
           <div class="card-title">💧 ความชื้น (Humidity)</div>
           <div class="metric-display">
             <div class="metric-value" id="v-hum">--.-</div>
-            <div style="color: var(--text-muted); font-weight: 600;">%RH</div>
+            <div style="color: var(--text-muted); font-weight: 600;" id="unit-hum">%RH</div>
           </div>
-          <div class="threshold-panel">
+          <div class="threshold-panel" id="panel-hum">
             <span>Min Limit: <b id="h-min" style="color:var(--accent-orange)">--</b></span>
             <span>Max Limit: <b id="h-max" style="color:var(--accent-red)">--</b></span>
           </div>
@@ -206,15 +258,42 @@ def dashboard():
             const res = await fetch('/api/data');
             const data = await res.json();
             
-            document.getElementById('v-temp').innerText = data.temp;
+            // อุณหภูมิ
+            if (data.en_t == 1) {
+              document.getElementById('v-temp').innerText = data.temp;
+              document.getElementById('unit-temp').style.display = 'block';
+              document.getElementById('panel-temp').style.display = 'flex';
+            } else {
+              document.getElementById('v-temp').innerHTML = '<span class="disabled-text">DISABLED</span>';
+              document.getElementById('unit-temp').style.display = 'none';
+              document.getElementById('panel-temp').style.display = 'none';
+            }
             document.getElementById('t-min').innerText = data.t_min;
             document.getElementById('t-max').innerText = data.t_max;
 
-            document.getElementById('v-carbon').innerText = data.carbon;
+            // คาร์บอน
+            if (data.en_c == 1) {
+              document.getElementById('v-carbon').innerText = data.carbon;
+              document.getElementById('unit-carbon').style.display = 'block';
+              document.getElementById('panel-carbon').style.display = 'flex';
+            } else {
+              document.getElementById('v-carbon').innerHTML = '<span class="disabled-text">DISABLED</span>';
+              document.getElementById('unit-carbon').style.display = 'none';
+              document.getElementById('panel-carbon').style.display = 'none';
+            }
             document.getElementById('c-min').innerText = data.c_min;
             document.getElementById('c-max').innerText = data.c_max;
 
-            document.getElementById('v-hum').innerText = data.hum;
+            // ความชื้น
+            if (data.en_h == 1) {
+              document.getElementById('v-hum').innerText = data.hum;
+              document.getElementById('unit-hum').style.display = 'block';
+              document.getElementById('panel-hum').style.display = 'flex';
+            } else {
+              document.getElementById('v-hum').innerHTML = '<span class="disabled-text">DISABLED</span>';
+              document.getElementById('unit-hum').style.display = 'none';
+              document.getElementById('panel-hum').style.display = 'none';
+            }
             document.getElementById('h-min').innerText = data.h_min;
             document.getElementById('h-max').innerText = data.h_max;
 
@@ -227,8 +306,9 @@ def dashboard():
     </body>
     </html>
     """
-    return render_template_string(html_content)
+  return render_template_string(html_content)
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+
+if __name__ == "__main__":
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port, debug=False)
