@@ -25,4 +25,4 @@ COPY app.py .
 ENV PORT=10000
 
 # รันเซิร์ฟเวอร์
-CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 60 --workers 1 app:app
+CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 120 --workers 1 app:app
