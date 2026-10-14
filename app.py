@@ -1,7 +1,8 @@
 from datetime import datetime
 import io
 import os
-from flask import CORS, Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, render_template_string, request
+from flask_cors import CORS
 import numpy as np
 from PIL import Image
 import pytesseract
@@ -249,7 +250,7 @@ def dashboard():
 
       <div class="footer-info">
         <div>Architecture: Flask / Cloud OCR Engine</div>
-        <div>Last Synchronized: <span id="v-time" style="color: var(--text-main); font-family: monospace;">Waiting for sync...</span></div>
+        <div>Last Synchronized: <span id="v-time" style="color: var:: var(--text-main); font-family: monospace;">Waiting for sync...</span></div>
       </div>
 
       <script>
