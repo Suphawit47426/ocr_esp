@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir \
     pillow \
     numpy \
     pytesseract \
-    gunicorn
+    gunicorn \
+    pytz
 
 # ก๊อปปี้ไฟล์โค้ดเข้า Container
 COPY app.py .
