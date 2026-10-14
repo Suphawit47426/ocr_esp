@@ -9,10 +9,8 @@ import pytesseract
 import pytz
 
 app = Flask(__name__)
-# ปลดล็อค CORS ให้อุปกรณ์ภายนอกส่งรูปเข้ามาได้
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# ตัวแปรเก็บค่าเซ็นเซอร์ปัจจุบัน, สถานะเปิด/ปิด (Toggles) และค่า Threshold สำหรับหน้า Dashboard
 system_data = {
     "temp": 0,
     "carbon": 0,
@@ -35,9 +33,6 @@ def health_check():
   return jsonify({"status": "Cloud OCR Server is running!"}), 200
 
 
-# ---------------------------------------------------------
-# ฟังก์ชันเดิมของคุณ (ห้ามแก้ไขโครงสร้างการประมวลผล OCR)
-# ---------------------------------------------------------
 @app.route("/process_ocr", methods=["POST"])
 def process_ocr():
   if "image" not in request.files:
@@ -51,8 +46,6 @@ def process_ocr():
 
   try:
     image = Image.open(io.BytesIO(image_bytes)).convert("L")
-
-    # ปรับให้อ่านเฉพาะตัวเลขและจุดทศนิยมแบบบรรทัดเดียว
     custom_config = r"--psm 7 -c tessedit_char_whitelist=0123456789.-"
     detected_number = pytesseract.image_to_string(
         image, config=custom_config
@@ -69,9 +62,6 @@ def process_ocr():
     return jsonify({"success": False, "number": "ERR", "error": str(e)}), 500
 
 
-# ---------------------------------------------------------
-# ส่วนรับข้อมูล, API และ Dashboard สไตล์วิศวกร (รองรับ Toggle ปิดแสดงผล)
-# ---------------------------------------------------------
 @app.route("/update_readings", methods=["POST"])
 def update_readings():
   global system_data
@@ -95,7 +85,6 @@ def update_readings():
     except:
       pass
 
-  # รับสถานะเปิด/ปิดเซ็นเซอร์ (Toggles)
   if "en_t" in data:
     try:
       system_data["en_t"] = int(data.get("en_t"))
@@ -250,7 +239,7 @@ def dashboard():
 
       <div class="footer-info">
         <div>Architecture: Flask / Cloud OCR Engine</div>
-        <div>Last Synchronized: <span id="v-time" style="color: var:: var(--text-main); font-family: monospace;">Waiting for sync...</span></div>
+        <div>Last Synchronized: <span id="v-time" style="color: var(--text-main); font-family: monospace;">Waiting for sync...</span></div>
       </div>
 
       <script>
@@ -259,7 +248,6 @@ def dashboard():
             const res = await fetch('/api/data');
             const data = await res.json();
             
-            // อุณหภูมิ
             if (data.en_t == 1) {
               document.getElementById('v-temp').innerText = data.temp;
               document.getElementById('unit-temp').style.display = 'block';
@@ -272,7 +260,6 @@ def dashboard():
             document.getElementById('t-min').innerText = data.t_min;
             document.getElementById('t-max').innerText = data.t_max;
 
-            // คาร์บอน
             if (data.en_c == 1) {
               document.getElementById('v-carbon').innerText = data.carbon;
               document.getElementById('unit-carbon').style.display = 'block';
@@ -285,7 +272,6 @@ def dashboard():
             document.getElementById('c-min').innerText = data.c_min;
             document.getElementById('c-max').innerText = data.c_max;
 
-            // ความชื้น
             if (data.en_h == 1) {
               document.getElementById('v-hum').innerText = data.hum;
               document.getElementById('unit-hum').style.display = 'block';
